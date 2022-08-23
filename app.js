@@ -1,11 +1,3 @@
-/*
- * to install: 
- * 
- * npm i fs.promises.exists
- * npm i selenium-webdriver
- * 
- */ 
-
 const {WebDriver, Builder, Browser, By, Key, until} = require('selenium-webdriver');
 let chrome = require('selenium-webdriver/chrome');
 const cookieParser = require('cookie-parser');
@@ -18,7 +10,7 @@ const GOOGLE_FIND_URL = 'https://www.google.com/android/find';
 const COOKIE_FILE = './findmyphone-google-cookie.json';
 
 
-/* these are the initial cookies needed for proper login. however, since the credentials present in this file are not valid for ever cookies needs to be refreshed (while logged in)
+/* these are the initial cookies needed for proper login. however, since the credentials present in this file are not valid for ever, cookies needs to be refreshed (while logged in)
  * 
  */ 
 const COOKIES = '';
@@ -74,10 +66,14 @@ class FindMyPhone {
                 await fmp.driver.manage().addCookie({name: parts[0], value: parts[1]});
             }
             await this.refreshPage();
-            if ( await this.isLoggedIn() ) {
+            let isLoggedIn = await this.isLoggedIn();
+            if (isLoggedIn) {
                 await this.saveCookies();
+                return true;
             }
-            return true;
+            else {
+                return false;
+            }
         }
         catch(err) {
             console.error(err);
@@ -114,7 +110,6 @@ class FindMyPhone {
                 console.error("Cannot load cookies: Cookie file does not exist.")
                 return;
             }
-            
             let cookies_json = await fs.readFile(COOKIE_FILE);
             let cookies = JSON.parse(cookies_json);
             for (let cookie of cookies) {
@@ -160,32 +155,40 @@ class FindMyPhone {
      * pseudocode:
      * is user logged in? 
      *      if not, check if cookie file exists
-     *          if cookie file exists, load from cookies from file -> driver
+     *          if cookie file exists, load cookies: file -> driver
      *      refresh page
      * 
      * then check another time:
      * is user logged in?
-     *      if so, save cookies driver -> file
-     *      if not, load cookies from user provided init-cookies -> driver, then refresh page, check another time if user is logged in. if so, save cookies, if not, print error message
+     *      if so, save cookies: driver -> file
+     *      if not, init cookies: cookie-variable -> driver, then refresh page, check another time if user is logged in. if so, save cookies, if not, print error message
      */ 
     async refreshCookies() {
         try {
             await this.navigateHome();
             
-            if ( await this.isLoggedIn() ) {
-                this.loadCookies();
+            let isLoggedIn = await this.isLoggedIn();
+            
+            if ( !isLoggedIn ) {
+                console.log("refreshCookies: Loading cookies from file...");
+                await this.loadCookies();
             }
             
+            isLoggedIn = await this.isLoggedIn();
             
-            if ( await this.isLoggedIn() ) {
-                await this.loadCookies();
+            if ( isLoggedIn ) {
+                console.log("refreshCookies(): Saving cookies to file...");
                 await this.saveCookies();
-                console.log("Run refreshCookies() successfully.");
+                console.log("User is logged in.");
             }
             else {
-                console.log("User is not logged in.");
-                if (await !this.initializeCookies(COOKIES)) {
-                    console.error('Failed to login to Google Find My Phone. Update your cookies!');
+                console.log("User is still not logged in. Using cookie-variable instead...");
+                let initCookies = await this.initializeCookies(COOKIES);
+                if (!initCookies) {
+                    console.error('Failed to login to Google Find My Phone. Modify your cookie-variable!');
+                }
+                else {
+                    console.log("User logged in using cookie-variable.");
                 }
             }
             
